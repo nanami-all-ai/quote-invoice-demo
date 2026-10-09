@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>見積書・請求書ツール（材料の登録つき・1画面デモ）</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#1c2430;--mute:#5d6b7c;--line:#d9dee5;--acc:#1f3a5f;--ok:#0f7b4b;--warn:#a5540b}
+@media (prefers-color-scheme:dark){:root{--bg:#12161c;--card:#1b222b;--ink:#e8ecf1;--mute:#9aa7b6;--line:#2c3644;--acc:#7fb0ee;--ok:#5cd19a;--warn:#f0a35c}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.7 -apple-system,"Hiragino Sans","Noto Sans JP",sans-serif}
+main{max-width:780px;margin:0 auto;padding:20px 16px 56px}
+h1{font-size:1.25rem;margin:.2em 0 .1em}
+h2{font-size:1rem;margin:0 0 6px}
+.sub{color:var(--mute);font-size:.9rem;margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}
+label{display:block;font-weight:600;margin:10px 0 4px;font-size:.92rem}
+.hint{font-weight:400;color:var(--mute);font-size:.82rem}
+input,select,textarea{width:100%;padding:10px 12px;font:inherit;font-size:1rem;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+textarea{min-height:92px;resize:vertical}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.row>*{min-width:0}
+.seg{display:flex;gap:8px;margin:4px 0 8px}
+.seg label{flex:1;margin:0;font-weight:600}
+.seg input{position:absolute;opacity:0;width:0}
+.seg span{display:block;text-align:center;padding:10px;border:1px solid var(--line);border-radius:8px;cursor:pointer}
+.seg input:checked+span{background:var(--acc);color:var(--card);border-color:var(--acc)}
+.item{display:grid;grid-template-columns:2.2fr .8fr .7fr 1.1fr .9fr 1.1fr auto auto;gap:6px;align-items:center;margin:6px 0}
+.item input,.item select{padding:8px;font-size:.95rem}
+.item .amt{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.head{font-size:.75rem;color:var(--mute)}
+button{font:inherit;padding:9px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button.pri{background:var(--acc);color:var(--card);border-color:var(--acc);font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.chip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:0 4px 0 0;background:var(--bg)}
+.chip .add{border:0;background:none;padding:7px 4px 7px 12px;font-size:.92rem}
+.chip .del{border:0;background:none;padding:4px 8px;color:var(--mute)}
+table{width:100%;border-collapse:collapse}
+td{padding:7px 0;border-bottom:1px solid var(--line)}
+td:last-child{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+tr.total td{font-size:1.15rem;border-bottom:0;color:var(--acc)}
+.note{color:var(--mute);font-size:.82rem}
+.err{color:var(--warn);font-size:.85rem;min-height:1.2em}
+.msg{font-size:.88rem;min-height:1.2em}
+.msg.ng{color:var(--warn)}
+.only-inv{display:none}
+body.inv .only-inv{display:block}
+body.inv .only-quo{display:none}
+@media (max-width:640px){.item{grid-template-columns:1fr 1fr 1fr}.item .name{grid-column:1/-1}.head{display:none}}
+@media print{body{background:#fff;color:#000}.no-print,.seg,.item button,#add,.hint{display:none!important}main{padding:0}.card{border:0;padding:0}input,select{border:0;padding:0;appearance:none;background:none;color:#000}}
+</style>
+</head>
+<body>
+<main>
+<h1>見積書・請求書ツール</h1>
+<p class="sub no-print">よく使う材料を登録しておくと、タップや手書きメモの貼り付けで、明細に入ります。税率ごとの消費税と合計も、そのまま出ます。</p>
+
+<div class="card no-print">
+  <div class="seg" role="radiogroup" aria-label="書類の種類">
+    <label><input type="radio" name="kind" value="quo" checked><span>見積書</span></label>
+    <label><input type="radio" name="kind" value="inv"><span>請求書</span></label>
+  </div>
+  <div class="row">
+    <div><label>宛名（お客様）</label><input id="to" placeholder="例：〇〇工務店 御中"></div>
+    <div><label>発行者名（自社）</label><input id="from" placeholder="例：△△建設"></div>
+  </div>
+  <div class="row">
+    <div><label>発行日</label><input id="date" type="date"></div>
+    <div><label><span class="only-quo">有効期限</span><span class="only-inv">お支払期限</span></label><input id="due" type="date"></div>
+  </div>
+  <div class="only-inv">
+    <div class="row">
+      <div><label>登録番号 <span class="hint">（適格請求書発行事業者の場合。T＋13桁）</span></label><input id="regno" placeholder="T1234567890123" maxlength="14"></div>
+      <div><label>振込先</label><input id="bank" placeholder="〇〇銀行 △△支店 普通 1234567"></div>
+    </div>
+  </div>
+</div>
+
+<div class="card no-print">
+  <h2>よく使う材料（この端末に保存）</h2>
+  <div id="chips" class="chips"></div>
+  <p class="note" id="chipsEmpty">まだ登録がありません。下の「材料を登録する」か、明細の★で登録できます。</p>
+  <details>
+    <summary>材料を登録する（Excelからコピーして貼り付け）</summary>
+    <label>品名・単価・単位・税率の順に、1行ずつ <span class="hint">（単位と税率は省略できます。税率は4列目に 8 か 10、または「8%」「軽減」。Excelの表をそのまま貼れます）</span></label>
+    <textarea id="masterText" placeholder="石膏ボード	1200	枚&#10;ビス	800	箱&#10;缶コーヒー	120	本	8"></textarea>
+    <button id="masterAdd" type="button">登録する</button>
+    <div class="msg" id="masterMsg"></div>
+  </details>
+  <details>
+    <summary>手書きメモから入れる</summary>
+    <label>「品名 数量」を、1行ずつ貼り付け <span class="hint">（登録した材料と照合して、明細に入ります）</span></label>
+    <textarea id="memo" placeholder="石膏ボード 12&#10;ビス 2箱&#10;パテ 3"></textarea>
+    <button id="memoGo" type="button">メモから入れる</button>
+    <div class="msg" id="memoMsg"></div>
+  </details>
+  <p class="note">登録した材料は、お使いのブラウザにだけ保存されます。外部には送信されません。</p>
+</div>
+
+<div class="card">
+  <div class="item head"><span>品名</span><span>数量</span><span>単位</span><span>単価（税抜・円）</span><span>税率</span><span>金額</span><span></span><span></span></div>
+  <div id="items"></div>
+  <button id="add" class="no-print">＋ 品目を追加</button>
+  <div class="err" id="err"></div>
+</div>
+
+<div class="card no-print">
+  <div class="row">
+    <div><label>端数処理（消費税・明細金額）</label>
+      <select id="round"><option value="floor">切り捨て</option><option value="round">四捨五入</option><option value="ceil">切り上げ</option></select></div>
+    <div><label>値引き（税抜・円） <span class="hint">税率が混在する場合は、税率ごとに按分</span></label><input id="disc" type="text" value="0" inputmode="numeric"></div>
+  </div>
+</div>
+
+<div class="card">
+  <table id="sum"></table>
+</div>
+
+<div class="card no-print">
+  <button class="pri" id="print">印刷／PDFにする</button>
+  <p class="note">税率ごとの税抜合計に対して、消費税の端数処理を1回だけ行います（インボイス制度で認められている計算方法の一つです）。計算結果は目安です。最終の確認は、ご自身（または税理士）で行ってください。<br>入力した内容は、この端末の中だけで計算され、外部には送信されません（このページは外部と通信しません）。</p>
+</div>
+</main>
+
+<script>
+/* ---- CALC-START（検算スクリプトが、ここから CALC-END までを取り出して実行する） ---- */
+function applyRound(x, mode){
+  var n=x[0], d=x[1];
+  if(mode==='ceil') return Math.floor((n+d-1)/d);
+  if(mode==='round') return Math.floor((2*n+d)/(2*d));
+  return Math.floor(n/d);
+}
+// 数量は小数第2位まで、税率は 10 または 8（%）。金額はすべて整数（円）
+function calc(items, opts){
+  var mode=opts.round||'floor', disc=opts.disc||0;
+  var lines=[], byRate={}, gross=0, i;
+  for(i=0;i<items.length;i++){
+    var it=items[i];
+    var q=Math.round(it.qty*100);
+    var amt=applyRound([q*it.price,100],mode);
+    lines.push({name:it.name,qty:it.qty,unit:it.unit,price:it.price,rate:it.rate,amount:amt});
+    byRate[it.rate]=(byRate[it.rate]||0)+amt;
+    gross+=amt;
+  }
+  var rates=Object.keys(byRate).map(Number).sort(function(a,b){return b-a;});
+  var left=Math.min(disc,gross), out=[], subtotal=0, tax=0, r;
+  for(i=0;i<rates.length;i++){
+    r=rates[i];
+    var share=(i===rates.length-1)?left:Math.floor(Math.min(disc,gross)*byRate[r]/(gross||1));
+    if(i<rates.length-1) left-=share;
+    var net=byRate[r]-share;
+    var t=applyRound([net*r,100],mode);
+    out.push({rate:r,net:net,tax:t,total:net+t});
+    subtotal+=net; tax+=t;
+  }
+  return {lines:lines,groups:out,subtotal:subtotal,tax:tax,total:subtotal+tax,gross:gross,discount:Math.min(disc,gross)};
+}
+// 全角数字・全角ピリオド・全角パーセントを半角にする。カンマは、3桁区切りの数字（例 1,200）のときだけ取る
+function normNum(s){
+  var t=String(s).replace(/[０-９]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-65248);}).replace(/[．]/g,'.').replace(/[，]/g,',').replace(/％/g,'%');
+  return /^[0-9]{1,3}(,[0-9]{3})+(\.[0-9]+)?$/.test(t)?t.replace(/,/g,''):t;
+}
+var LIMIT_PRICE=10000000, LIMIT_QTY=100000;
+// 材料の登録テキスト：品名 単価 [単位] [税率] の順（タブ区切り、またはスペース区切り）
+function parseMaster(text){
+  var items=[], errors=[];
+  String(text).split(/\r?\n/).forEach(function(line,i){
+    line=line.trim(); if(!line) return;
+    var t=(line.indexOf('\t')>=0?line.split('\t').map(function(x){return x.trim();}):line.split(/[ \u3000]+/).map(function(x){return x.trim();}).filter(function(x){return x!=='';}));
+    while(t.length>2&&t[t.length-1]==='') t.pop();
+    var n=(i+1)+'行目：';
+    if(t.length<2||t[0]===''){errors.push(n+'品名と単価を入れてください。');return;}
+    var p=normNum(t[1]);
+    if(!/^\d+$/.test(p)||parseInt(p,10)>LIMIT_PRICE){errors.push(n+'単価は、0以上'+LIMIT_PRICE.toLocaleString('ja-JP')+'以下の整数で入れてください。');return;}
+    var unit='式', rate=10, bad=false;
+    for(var k=2;k<t.length;k++){
+      var nt=normNum(t[k]), m=/^(8|10)%$/.exec(nt);
+      if(/^軽減(税率)?$/.test(t[k])||nt==='8%'){rate=8;}
+      else if(m){rate=parseInt(m[1],10);}
+      else if(k===3&&/^(8|10)$/.test(nt)){rate=parseInt(nt,10);}
+      else if(k===2){ if(t[k]!=='') unit=t[k]; }
+      else if(t[k]===''){}
+      else {bad=true;}
+    }
+    if(bad){errors.push(n+'単位・税率の並びが正しくありません（品名、単価、単位、税率の順。税率は4列目に 8 か 10）。');return;}
+    items.push({name:t[0],unit:unit,price:parseInt(p,10),rate:rate});
+  });
+  return {items:items,errors:errors};
+}
+// 手書きメモ：1行＝「品名 数量[単位]」。読み取りに迷う行は、入れずに知らせる（誤って入れるより、手で足す方が安全）
+function escRe(x){return x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
+function memoKey(x){return normNum(x).replace(/[×＊*\s]/g,'');}
+function parseMemo(text, master){
+  var rows=[], unmatched=[];
+  var sorted=master.slice().sort(function(a,b){return normNum(b.name).length-normNum(a.name).length;});
+  function ng(raw,reason){unmatched.push({line:raw,reason:reason});}
+  function put(raw,m,qty,unit){
+    if(!(qty>0)||qty>LIMIT_QTY){ng(raw,'数量が正しくありません');return;}
+    if(unit&&unit!==m.unit){ng(raw,'単位が登録（'+m.unit+'）と違います');return;}
+    rows.push({master:m,qty:qty});
+  }
+  String(text).split(/\r?\n/).forEach(function(line){
+    var raw=line.trim(); if(!raw) return;
+    var s=normNum(raw).replace(/[\u3000\s]+/g,' ').trim(), i, m, hit=null;
+    // 1) 登録した材料名と、行の頭から完全に一致（品名のあとは、空白か×で区切る）
+    for(i=0;i<sorted.length&&!hit;i++){
+      var nm=normNum(sorted[i].name).replace(/\s+/g,' ').trim();
+      if(!nm) continue;
+      if(s===nm){put(raw,sorted[i],1,'');hit=true;break;}
+      m=new RegExp('^'+escRe(nm)+'(?: +[×＊*]? *|[×＊*] *)([0-9]+(?:\\.[0-9]{1,2})?)(?: ?([^0-9 .]+))?$').exec(s);
+      if(m){put(raw,sorted[i],parseFloat(m[1]),m[2]||'');hit=true;break;}
+    }
+    if(hit) return;
+    // 2) 1行に複数の材料が書かれていそうな行は、入れない
+    if(/[、，,;；\/／]/.test(raw)){ng(raw,'1行に複数の材料、または区切りの記号があります。1行に1つにしてください');return;}
+    // 3) 略称（メモの名前が、登録名の一部）。最後の語が「数量[単位]」で、名前の側に数字だけの語がない場合だけ
+    var tk=s.split(' ');
+    m=tk.length>=2?/^([0-9]+(?:\.[0-9]{1,2})?)([^0-9 .]*)$/.exec(tk[tk.length-1]):null;
+    if(!m){ng(raw,'登録した材料に見つからないか、数量が数字で読み取れません');return;}
+    var nameTk=tk.slice(0,-1);
+    if(nameTk.some(function(x){return /^[0-9]+(?:\.[0-9]+)?[^0-9\s]*$/.test(x);})){ng(raw,'数字が複数あり、どれが数量か読み取れません');return;}
+    var nk=memoKey(nameTk.join(''));
+    // 略称（登録名の一部）は、別の完全な品名の可能性があるため、自動では入れない。心当たりの登録名を知らせる
+    var cand=nk.length>=2?master.filter(function(x){return memoKey(x.name).indexOf(nk)>=0;}):[];
+    if(cand.length){ng(raw,'登録名と一致しません。'+cand.map(function(x){return '「'+x.name+'」';}).join('、')+'のことなら、その名前で書いてください');return;}
+    ng(raw,'登録した材料に見つかりません');
+  });
+  return {rows:rows,unmatched:unmatched};
+}
+/* ---- CALC-END ---- */
+
+var itemsEl=document.getElementById('items');
+var KEY='quoteTool.master.v1', master=[];
+function loadMaster(){
+  master=[];
+  try{
+    var v=JSON.parse(localStorage.getItem(KEY)||'[]'); if(!Array.isArray(v)) return;
+    v.forEach(function(x){
+      if(!x||typeof x.name!=='string'||!x.name.trim()||x.name.length>60) return;
+      var okP=(typeof x.price==='number'&&isFinite(x.price)&&Math.floor(x.price)===x.price)||(typeof x.price==='string'&&/^\d+$/.test(x.price));
+      var okR=(typeof x.rate==='number'||typeof x.rate==='string')&&/^(8|10)$/.test(String(x.rate));
+      if(!okP||!okR) return;
+      var p=Number(x.price); if(p<0||p>LIMIT_PRICE) return;
+      master.push({name:x.name.trim(),unit:(typeof x.unit==='string'&&x.unit.trim()&&x.unit.length<=10)?x.unit.trim():'式',price:p,rate:Number(x.rate)});
+    });
+  }catch(e){master=[];}
+}
+function saveMaster(){ try{ localStorage.setItem(KEY,JSON.stringify(master)); }catch(e){} }
+function yen(n){return n.toLocaleString('ja-JP')+'円';}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function upsertMaster(m){
+  var i; for(i=0;i<master.length;i++){ if(master[i].name===m.name){master[i]=m;return 'update';} }
+  master.push(m); return 'new';
+}
+function renderChips(){
+  var el=document.getElementById('chips'); el.innerHTML='';
+  master.forEach(function(m,i){
+    var c=document.createElement('span'); c.className='chip';
+    c.innerHTML='<button type="button" class="add" title="明細に追加">＋ '+esc(m.name)+'（'+m.price.toLocaleString('ja-JP')+'円/'+esc(m.unit)+(m.rate===8?'・8%':'')+'）</button><button type="button" class="del" aria-label="登録から削除">×</button>';
+    c.querySelector('.add').onclick=function(){addFromMaster(m,1);render();};
+    c.querySelector('.del').onclick=function(){master.splice(i,1);saveMaster();renderChips();};
+    el.appendChild(c);
+  });
+  document.getElementById('chipsEmpty').style.display=master.length?'none':'';
+}
+function addItem(v){
+  v=v||{};
+  var d=document.createElement('div'); d.className='item';
+  d.innerHTML='<input class="name" placeholder="例：石膏ボード" value="'+esc(v.name||'')+'">'+
+  '<input class="qty" type="text" value="'+(v.qty!=null?v.qty:1)+'" inputmode="decimal">'+
+  '<input class="unit" placeholder="式" value="'+esc(v.unit||'式')+'">'+
+  '<input class="price" type="text" value="'+(v.price!=null?v.price:0)+'" inputmode="numeric">'+
+  '<select class="rate"><option value="10">10%</option><option value="8">8%（軽減）</option></select>'+
+  '<button type="button" class="star" title="この行を、よく使う材料に登録" aria-label="この行を登録">★</button>'+
+  '<button type="button" class="rm" aria-label="この行を削除">×</button>';
+  d.querySelector('.rate').value=String(v.rate||10);
+  d.querySelector('.rm').onclick=function(){d.remove();render();};
+  d.querySelector('.star').onclick=function(){
+    var nm=d.querySelector('.name').value.trim(), ps=normNum(d.querySelector('.price').value.trim());
+    if(!nm||!/^\d+$/.test(ps)||parseInt(ps,10)>LIMIT_PRICE){document.getElementById('err').textContent='登録には、品名と、整数の単価が必要です。';return;}
+    upsertMaster({name:nm,unit:d.querySelector('.unit').value.trim()||'式',price:parseInt(ps,10),rate:parseInt(d.querySelector('.rate').value,10)});
+    saveMaster();renderChips();render();
+  };
+  d.addEventListener('input',render);
+  itemsEl.appendChild(d);
+  return d;
+}
+// 登録した材料を明細に入れる。同じ材料（品名・単価・税率が同じ行）があれば、数量を足す
+function addFromMaster(m,qty){
+  var rows=itemsEl.querySelectorAll('.item'), i;
+  for(i=0;i<rows.length;i++){
+    var r=rows[i], qs=normNum(r.querySelector('.qty').value.trim());
+    if(r.querySelector('.name').value===m.name&&normNum(r.querySelector('.price').value)===String(m.price)&&r.querySelector('.rate').value===String(m.rate)&&/^\d+(\.\d{1,2})?$/.test(qs)){
+      r.querySelector('.qty').value=String(Math.round((parseFloat(qs)+qty)*100)/100); return;
+    }
+  }
+  addItem({name:m.name,qty:qty,unit:m.unit,price:m.price,rate:m.rate});
+}
+function read(){
+  var arr=[], bad='';
+  itemsEl.querySelectorAll('.item').forEach(function(d,i){
+    var qs=normNum(d.querySelector('.qty').value.trim()), ps=normNum(d.querySelector('.price').value.trim()), n=(i+1)+'行目';
+    if(!/^\d+(\.\d{1,2})?$/.test(qs)||parseFloat(qs)>LIMIT_QTY){ if(!bad) bad=n+'の数量は、0以上'+LIMIT_QTY.toLocaleString('ja-JP')+'以下の、小数第2位までの数で入れてください。'; return; }
+    if(!/^\d+$/.test(ps)||parseInt(ps,10)>LIMIT_PRICE){ if(!bad) bad=n+'の単価は、0以上'+LIMIT_PRICE.toLocaleString('ja-JP')+'以下の整数（円）で入れてください。'; return; }
+    arr.push({name:d.querySelector('.name').value,qty:parseFloat(qs),unit:d.querySelector('.unit').value,price:parseInt(ps,10),rate:parseInt(d.querySelector('.rate').value,10)});
+  });
+  var ds=normNum(document.getElementById('disc').value.trim());
+  var disc=0;
+  if(ds!==''){ if(!/^\d+$/.test(ds)||parseInt(ds,10)>1000000000){ if(!bad) bad='値引きは、0以上の整数（円）で入れてください。'; } else disc=parseInt(ds,10); }
+  return {items:arr,bad:bad,disc:disc};
+}
+function setAmt(d,text){var a=d.querySelector('.amt'); if(!a){a=document.createElement('div');a.className='amt';d.insertBefore(a,d.querySelector('.star'));} a.textContent=text;}
+function render(){
+  var r=read(), errEl=document.getElementById('err'), sumEl=document.getElementById('sum');
+  errEl.textContent=r.bad;
+  var rows=itemsEl.querySelectorAll('.item');
+  if(r.bad){
+    rows.forEach(function(d){setAmt(d,'—');});
+    sumEl.innerHTML='<tr><td>入力に誤りがあるため、合計は表示しません</td><td>—</td></tr>';
+    return;
+  }
+  var c=calc(r.items,{round:document.getElementById('round').value,disc:r.disc});
+  rows.forEach(function(d,i){setAmt(d,yen(c.lines[i].amount));});
+  var isInv=document.body.classList.contains('inv');
+  var h='<tr><td>'+(isInv?'請求':'見積')+'金額（税抜）'+(c.discount?'（値引き後）':'')+'</td><td>'+yen(c.subtotal)+'</td></tr>';
+  if(c.discount) h+='<tr><td>値引き（税抜）</td><td>−'+yen(c.discount)+'</td></tr>';
+  c.groups.forEach(function(g){h+='<tr><td>'+g.rate+'%対象 '+yen(g.net)+' ／ 消費税</td><td>'+yen(g.tax)+'</td></tr>';});
+  h+='<tr class="total"><td>合計（税込）</td><td>'+yen(c.total)+'</td></tr>';
+  sumEl.innerHTML=h;
+}
+function setMsg(id,text,ng){var e=document.getElementById(id);e.textContent=text;e.className='msg'+(ng?' ng':'');}
+document.getElementById('masterAdd').onclick=function(){
+  var r=parseMaster(document.getElementById('masterText').value);
+  r.items.forEach(upsertMaster);
+  if(r.items.length){saveMaster();renderChips();}
+  setMsg('masterMsg',(r.items.length?r.items.length+'件を登録しました。':'')+(r.errors.length?' '+r.errors.join(' '):''),r.errors.length>0);
+  if(!r.errors.length) document.getElementById('masterText').value='';
+};
+document.getElementById('memoGo').onclick=function(){
+  var r=parseMemo(document.getElementById('memo').value,master);
+  r.rows.forEach(function(x){addFromMaster(x.master,x.qty);});
+  render();
+  var t=r.rows.length?r.rows.length+'行を、明細に入れました。':'';
+  if(r.unmatched.length) t+=' 入れられなかった行：'+r.unmatched.map(function(u){return '「'+u.line+'」（'+u.reason+'）';}).join('、')+'。手で追加してください。';
+  setMsg('memoMsg',t||'メモが空です。',r.unmatched.length>0||!t);
+};
+document.getElementById('add').onclick=function(){addItem();render();};
+['round','disc','date','due','to','from','regno','bank'].forEach(function(id){document.getElementById(id).addEventListener('input',render);});
+document.querySelectorAll('input[name=kind]').forEach(function(r){r.addEventListener('change',function(){document.body.classList.toggle('inv',r.value==='inv'&&r.checked);render();});});
+document.getElementById('print').onclick=function(){window.print();};
+document.getElementById('date').value=new Date().toISOString().slice(0,10);
+loadMaster(); renderChips();
+addItem({name:'外壁補修工事',qty:1,unit:'式',price:120000,rate:10});
+addItem({name:'材料費（塗料）',qty:3.5,unit:'缶',price:8800,rate:10});
+addItem({name:'飲料（現場差し入れ）',qty:12,unit:'本',price:98,rate:8});
+render();
+</script>
+</body>
+</html>
